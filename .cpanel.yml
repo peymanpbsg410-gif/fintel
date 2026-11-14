@@ -1,7 +1,6 @@
----
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/fintelmp/public_html/
+    - export DEPLOYPATH=/home/fintelmp/public_html
     - /bin/cp index.html $DEPLOYPATH
     - /bin/cp -R frontend $DEPLOYPATH
     - /bin/cp -R backend $DEPLOYPATH
