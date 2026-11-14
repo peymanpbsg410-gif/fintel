@@ -14,23 +14,17 @@ def get_all_debt_securities():
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as response:
-            # خواندن با انکودینگ صحیح (latin1 یا cp1256 برای هندل کردن بایت‌های خاص TSETMC)
             raw_data = response.read()
             text_data = raw_data.decode('latin1')
             
-            # پردازش بخش اوراق (بخش 2 در داده‌های MarketWatchInit معمولاً مربوط به اوراق یا ابزارهای مالی است)
-            # ساختار ساده برای استخراج و بازگرداندن داده‌ها
             parts = text_data.split('@')
             securities = []
             
-            # جستجو در بخش‌های مختلف داده‌های بازار
             for part in parts:
                 rows = part.split(';')
                 for row in rows:
                     fields = row.split(',')
-                    # اوراق بدهی معمولاً فیلدهای مشخصی دارند (مثلاً نوع ابزار یا گروه صنعتی)
                     if len(fields) > 15:
-                        # نمونه ساده جهت نمایش ستون‌ها: نام، آخرین معامله، قیمت پایانی، قیمت روز قبل
                         securities.append({
                             "name": fields[2] if len(fields) > 2 else "نامشخص",
                             "volume": fields[5] if len(fields) > 5 else "0",
@@ -38,7 +32,7 @@ def get_all_debt_securities():
                             "closingPrice": fields[4] if len(fields) > 4 else "0",
                             "yesterdayPrice": fields[7] if len(fields) > 7 else "0"
                         })
-            return securities[:50] # بازگرداندن نمونه اوراق برای تست
+            return securities[:50]
     except Exception as e:
         return [{"error": str(e)}]
 
@@ -54,7 +48,6 @@ def app(environ, start_response):
         ])
         return [response_body]
     
-    # صفحه پیش‌فرض
     start_response('200 OK', [('Content-Type', 'text/html; charset=utf-8')])
     html = """
     <!DOCTYPE html>
