@@ -1,5 +1,7 @@
-   ---
-   deployment:
-     tasks:
-       - export DEPLOYPATH=/home/fintelmp/public_html/
-       - /bin/cp -r * $DEPLOYPATH
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/fintelmp/public_html/
+    - /bin/cp /home/fintelmp/repositories/fintel_new/index.html $DEPLOYPATH
+    - /bin/cp /home/fintelmp/repositories/fintel_new/market-yield.html $DEPLOYPATH
+    - /bin/cp -R /home/fintelmp/repositories/fintel_new/css $DEPLOYPATH
