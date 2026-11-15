@@ -1,7 +1,0 @@
-deployment:
-  tasks:
-    - export DEPLOYPATH=/home/fintelmp/public_html
-    - /bin/cp index.html $DEPLOYPATH
-    - /bin/cp -R frontend $DEPLOYPATH
-    - /bin/cp backend/api.py $DEPLOYPATH/passenger_wsgi.py
-    - /bin/touch $DEPLOYPATH/tmp/restart.txt

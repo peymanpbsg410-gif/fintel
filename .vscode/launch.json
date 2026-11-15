@@ -1,2 +1,0 @@
-fetch('/backend/api.py')
-
