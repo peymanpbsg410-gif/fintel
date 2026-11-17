@@ -22,16 +22,6 @@
   svg.addEventListener('pointermove',show);svg.addEventListener('pointerleave',()=>tooltip.classList.remove('is-visible'));svg.addEventListener('focusin',e=>show(e));svg.addEventListener('focusout',()=>tooltip.classList.remove('is-visible'));
 })();
 
- function saveLoginInfo(){
-    var username=document.getElementById('new-username').value.trim();
-    var password=document.getElementById('new-password').value;
-    var repeat=document.getElementById('repeat-password').value;
-    var message=document.getElementById('login-message');
-    message.classList.remove('error');
-    if(password!==repeat){message.textContent='رمز عبور و تکرار آن یکسان نیستند.';message.classList.add('error');return}
-    if(!username || !password){message.textContent='لطفاً نام کاربری و رمز عبور جدید را وارد کنید.';message.classList.add('error');return}
-    message.textContent='اطلاعات ورود بررسی شد؛ در این نسخه چیزی ذخیره نمی‌شود.';
-  }
   function addFeeRow(){
     var row=document.createElement('tr');
     var nameCell=document.createElement('td');
@@ -39,19 +29,6 @@
     ['کارمزد خرید درصد','کارمزد فروش درصد'].forEach(function(label){var cell=document.createElement('td');var input=document.createElement('input');input.type='number';input.min='0';input.step='0.001';input.className='settings-input fee-number';input.setAttribute('aria-label',label);cell.appendChild(input);row.appendChild(cell)});
     document.getElementById('fees-table-body').appendChild(row);
     name.focus();
-  }
-  function addIconPreview(){
-    var title=document.getElementById('icon-title').value.trim();
-    var actionName=document.getElementById('icon-action-name').value.trim();
-    if(!title){document.getElementById('icon-title').focus();return}
-    var list=document.getElementById('created-icons');
-    if(list.querySelector('.settings-note')) list.replaceChildren();
-    var item=document.createElement('div');item.className='created-icon-preview';
-    var swatch=document.createElement('span');swatch.className='created-icon-swatch';swatch.style.backgroundColor=document.getElementById('icon-color').value;
-    var text=document.createElement('div');var heading=document.createElement('strong');heading.textContent=title;text.appendChild(heading);
-    if(actionName){var detail=document.createElement('small');detail.textContent=actionName;text.appendChild(detail)}
-    item.appendChild(swatch);item.appendChild(text);list.appendChild(item);
-    document.getElementById('icon-title').value='';document.getElementById('icon-action-name').value='';
   }
 
   var ACCESS_ROLE_STORAGE_KEY = 'bazdehyar-access-roles-v1';
@@ -144,25 +121,6 @@
   }
   var SMS_CONTACT_STORAGE_KEY = 'bondYarSmsContacts';
   var smsContacts = [];
-  function renderSmsContacts(){
-    var list=document.getElementById('sms-contacts-list');
-    var empty=document.getElementById('contacts-empty');
-    if(!list || !empty) return;
-    list.replaceChildren();
-    smsContacts.forEach(function(contact,index){
-      var row=document.createElement('tr');
-      var selectCell=document.createElement('td');var selectLabel=document.createElement('label');selectLabel.className='contact-row-select';
-      var checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.className='sms-contact-select';checkbox.dataset.index=String(index);checkbox.setAttribute('aria-label','انتخاب '+contact.name);checkbox.addEventListener('change',syncSmsSelectAll);
-      selectLabel.appendChild(checkbox);var hiddenText=document.createElement('span');hiddenText.className='sr-only';hiddenText.textContent='انتخاب مخاطب';selectLabel.appendChild(hiddenText);selectCell.appendChild(selectLabel);row.appendChild(selectCell);
-      [contact.name,contact.mobile].forEach(function(value){var cell=document.createElement('td');cell.textContent=value;row.appendChild(cell)});
-      var daysCell=document.createElement('td');var daysInput=document.createElement('input');daysInput.type='number';daysInput.min='0';daysInput.step='1';daysInput.inputMode='numeric';daysInput.value=String(contact.daysBefore);daysInput.className='settings-input contact-days-input';daysInput.setAttribute('aria-label','روز قبل از سررسید برای '+contact.name);daysInput.addEventListener('change',function(){updateSmsContactDays(index,daysInput)});daysCell.appendChild(daysInput);row.appendChild(daysCell);
-      var actionCell=document.createElement('td');var removeButton=document.createElement('button');removeButton.type='button';removeButton.className='settings-action';removeButton.style.marginTop='0';removeButton.textContent='حذف';removeButton.setAttribute('aria-label','حذف مخاطب '+contact.name);
-      removeButton.addEventListener('click',function(){smsContacts.splice(index,1);saveSmsContacts();renderSmsContacts()});
-      actionCell.appendChild(removeButton);row.appendChild(actionCell);list.appendChild(row);
-    });
-    empty.hidden=smsContacts.length>0;
-    syncSmsSelectAll();
-  }
   function updateSmsContactDays(index,input){
     var days=Number(input.value);var feedback=document.getElementById('contacts-feedback');
     if(!input.value || !Number.isInteger(days) || days<0){input.value=String(smsContacts[index].daysBefore);feedback.textContent='تعداد روز باید عدد صحیح و صفر یا بیشتر باشد.';feedback.classList.add('error');return}
@@ -175,18 +133,6 @@
   function saveSmsContacts(){
     try{localStorage.setItem(SMS_CONTACT_STORAGE_KEY,JSON.stringify(smsContacts));return true}
     catch(error){var feedback=document.getElementById('contacts-feedback');if(feedback){feedback.textContent='ذخیره در مرورگر انجام نشد.';feedback.classList.add('error')}return false}
-  }
-  function addSmsContact(){
-    var nameInput=document.getElementById('contact-name');
-    var mobileInput=document.getElementById('contact-mobile');
-    var daysInput=document.getElementById('contact-days-before');
-    var feedback=document.getElementById('contacts-feedback');
-    var name=nameInput.value.trim(),mobile=mobileInput.value.trim(),days=Number(daysInput.value);
-    feedback.classList.remove('error');
-    if(!name || !mobile || daysInput.value==='' || !Number.isInteger(days) || days<0){feedback.textContent='نام، شماره موبایل و تعداد روز معتبر را وارد کنید.';feedback.classList.add('error');return}
-    smsContacts.push({name:name,mobile:mobile,daysBefore:days});
-    if(saveSmsContacts()){feedback.textContent='مخاطب با موفقیت افزوده و ذخیره شد.'}
-    renderSmsContacts();nameInput.value='';mobileInput.value='';daysInput.value='1';nameInput.focus();
   }
   function initializeSmsContacts(){
     try{document.getElementById('sms-message-template').value=localStorage.getItem(SMS_TEMPLATE_STORAGE_KEY)||''}catch(error){}
@@ -331,6 +277,8 @@
   refreshAccountRoleOptions();renderUserAccounts();
   window.addEventListener('resize',renderDashboard);
 document.addEventListener('DOMContentLoaded',function(){['calc-radial-menu','settings-radial-menu'].forEach(function(id){positionRadialMenu(document.getElementById(id))})});
+})();
+
 (function(){
   'use strict';
   var loginView=document.getElementById('login-view');
@@ -346,23 +294,143 @@ document.addEventListener('DOMContentLoaded',function(){['calc-radial-menu','set
     jalaliNode.textContent=jalaliFormatter.format(now);
     gregorianNode.textContent=gregorianFormatter.format(now);
   }
-  window.handleLogin=function(){
-    var configured=window.FINTEL_CREDENTIALS||{};
-    var expectedUser=typeof configured.username==='string'?configured.username:'admin';
-    var expectedPassword=typeof configured.password==='string'?configured.password:'1234';
-    var username=document.getElementById('fintel-username').value.trim();
-    var password=document.getElementById('fintel-password').value;
-    var errorNode=document.getElementById('fintel-login-error');
-    if (username === expectedUser && password === expectedPassword) {
-      try { localStorage.setItem('fintel_logged_in', 'true'); } catch (e) {}
-      loginView.hidden = true;
-      errorNode.textContent = '';
-      return false;
-    }
-    errorNode.textContent = 'نام کاربری یا رمز عبور نادرست است.';
-    return false;
-  };
   updateFintelClock();
   window.setInterval(updateFintelClock,1000);
   try{if(localStorage.getItem('fintel_logged_in')==='true')loginView.hidden=true}catch(e){}
+})();
+
+(function () {
+  'use strict';
+
+  var IDLE_TIMEOUT_LIMIT = 15 * 60 * 1000;
+  var LOGIN_KEY = 'fintel_logged_in';
+  var LAST_ACTIVE_KEY = 'fintel_last_active';
+  var USERNAME_KEY = 'fintel_username';
+  var PASSWORD_KEY = 'fintel_password';
+
+  function resetIdleTimer() {
+    try {
+      if (localStorage.getItem(LOGIN_KEY) === 'true') {
+        localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
+      }
+    } catch (error) {}
+  }
+
+  function logoutUser() {
+    try {
+      localStorage.removeItem(LOGIN_KEY);
+      localStorage.removeItem(LAST_ACTIVE_KEY);
+    } catch (error) {}
+
+    var loginView = document.getElementById('login-view');
+    if (loginView) loginView.hidden = false;
+
+    var passwordInput = document.getElementById('fintel-password');
+    if (passwordInput) passwordInput.value = '';
+
+    var errorNode = document.getElementById('fintel-login-error');
+    if (errorNode) {
+      errorNode.textContent = 'نشست شما به دلیل ۱۵ دقیقه عدم فعالیت منقضی شد. لطفاً دوباره وارد شوید.';
+    }
+  }
+
+  function checkIdleTimeout() {
+    try {
+      if (localStorage.getItem(LOGIN_KEY) !== 'true') return;
+      var lastActive = Number(localStorage.getItem(LAST_ACTIVE_KEY));
+      if (!Number.isFinite(lastActive) || lastActive <= 0) {
+        resetIdleTimer();
+        return;
+      }
+      if (Date.now() - lastActive > IDLE_TIMEOUT_LIMIT) logoutUser();
+    } catch (error) {}
+  }
+
+  window.logoutUser = logoutUser;
+  window.handleLogin = function () {
+    var usernameInput = document.getElementById('fintel-username');
+    var passwordInput = document.getElementById('fintel-password');
+    var errorNode = document.getElementById('fintel-login-error');
+    var loginView = document.getElementById('login-view');
+    if (!usernameInput || !passwordInput) return false;
+
+    var expectedUser;
+    var expectedPassword;
+    try {
+      expectedUser = localStorage.getItem(USERNAME_KEY) || 'admin';
+      expectedPassword = localStorage.getItem(PASSWORD_KEY) || '1234';
+    } catch (error) {
+      expectedUser = 'admin';
+      expectedPassword = '1234';
+    }
+
+    if (usernameInput.value.trim() === expectedUser && passwordInput.value === expectedPassword) {
+      try {
+        localStorage.setItem(LOGIN_KEY, 'true');
+        localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
+      } catch (error) {}
+      if (loginView) loginView.hidden = true;
+      if (errorNode) errorNode.textContent = '';
+      passwordInput.value = '';
+      return false;
+    }
+
+    if (errorNode) errorNode.textContent = 'نام کاربری یا رمز عبور نادرست است.';
+    return false;
+  };
+
+  window.saveLoginInfo = function () {
+    var usernameNode = document.getElementById('new-username');
+    var passwordNode = document.getElementById('new-password');
+    var repeatNode = document.getElementById('repeat-password');
+    var messageNode = document.getElementById('login-message');
+    if (!usernameNode || !passwordNode || !repeatNode || !messageNode) return;
+
+    var newUsername = usernameNode.value.trim();
+    var newPassword = passwordNode.value;
+    messageNode.classList.remove('error');
+
+    if (!newUsername || !newPassword) {
+      messageNode.classList.add('error');
+      messageNode.textContent = 'لطفاً نام کاربری و رمز عبور جدید را وارد کنید.';
+      return;
+    }
+    if (newPassword !== repeatNode.value) {
+      messageNode.classList.add('error');
+      messageNode.textContent = 'رمز عبور جدید و تکرار آن یکسان نیستند.';
+      return;
+    }
+
+    try {
+      localStorage.setItem(USERNAME_KEY, newUsername);
+      localStorage.setItem(PASSWORD_KEY, newPassword);
+      messageNode.textContent = 'اطلاعات ورود با موفقیت ذخیره شد! از این پس با رمز جدید وارد خواهید شد.';
+      usernameNode.value = '';
+      passwordNode.value = '';
+      repeatNode.value = '';
+    } catch (error) {
+      messageNode.classList.add('error');
+      messageNode.textContent = 'خطا در ذخیره اطلاعات در مرورگر.';
+    }
+  };
+
+  ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'].forEach(function (eventName) {
+    window.addEventListener(eventName, resetIdleTimer, { passive: true });
+  });
+  window.setInterval(checkIdleTimeout, 60 * 1000);
+
+  function restoreLoginState() {
+    try {
+      var loginView = document.getElementById('login-view');
+      if (localStorage.getItem(LOGIN_KEY) === 'true' && loginView) {
+        loginView.hidden = true;
+        resetIdleTimer();
+      }
+    } catch (error) {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', restoreLoginState, { once: true });
+  } else {
+    restoreLoginState();
+  }
 })();
