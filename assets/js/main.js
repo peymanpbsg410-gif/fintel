@@ -299,28 +299,67 @@ document.addEventListener('DOMContentLoaded',function(){['calc-radial-menu','set
   try{if(localStorage.getItem('fintel_logged_in')==='true')loginView.hidden=true}catch(e){}
 })();
 
+
+
+
+
+/* ================= ۱) خروج خودکار پس از ۱۵ دقیقه بی‌فعالیتی ================= */
 (function () {
   'use strict';
 
-  var IDLE_TIMEOUT_LIMIT = 15 * 60 * 1000;
+  var IDLE_TIMEOUT_LIMIT = 15 * 60 * 1000;          /* ۱۵ دقیقه */
   var LOGIN_KEY = 'fintel_logged_in';
   var LAST_ACTIVE_KEY = 'fintel_last_active';
   var USERNAME_KEY = 'fintel_username';
   var PASSWORD_KEY = 'fintel_password';
+  var WRITE_THROTTLE = 4000;
+  var EXPIRED_MESSAGE = 'نشست شما به دلیل ۱۵ دقیقه عدم فعالیت منقضی شد. لطفاً دوباره وارد شوید.';
 
-  function resetIdleTimer() {
-    try {
-      if (localStorage.getItem(LOGIN_KEY) === 'true') {
-        localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
-      }
-    } catch (error) {}
+  var lastWrite = 0;
+  var memoryActive = 0;
+
+  function read(key) { try { return window.localStorage.getItem(key); } catch (e) { return null; } }
+  function write(key, value) { try { window.localStorage.setItem(key, value); return true; } catch (e) { return false; } }
+  function drop(key) { try { window.localStorage.removeItem(key); } catch (e) {} }
+
+  function isLoggedIn() { return read(LOGIN_KEY) === 'true'; }
+
+  function getLastActive() {
+    var stored = Number(read(LAST_ACTIVE_KEY));
+    if (isFinite(stored) && stored > 0) return stored;
+    return memoryActive;
   }
 
-  function logoutUser() {
-    try {
-      localStorage.removeItem(LOGIN_KEY);
-      localStorage.removeItem(LAST_ACTIVE_KEY);
-    } catch (error) {}
+  function markActive(force) {
+    if (!isLoggedIn()) return;
+    var now = Date.now();
+    if (!force && now - lastWrite < WRITE_THROTTLE) return;
+    lastWrite = now;
+    memoryActive = now;
+    write(LAST_ACTIVE_KEY, String(now));
+  }
+
+  function onActivity() { markActive(false); }
+
+  function closeMenus() {
+    ['calc-radial-menu', 'settings-radial-menu', 'fund-radial-menu'].forEach(function (id) {
+      var menu = document.getElementById(id);
+      if (!menu) return;
+      menu.classList.remove('is-open');
+      var center = menu.querySelector('.radial-center');
+      if (center) center.setAttribute('aria-expanded', 'false');
+    });
+    var modal = document.getElementById('placeholder-modal');
+    if (modal) modal.hidden = true;
+  }
+
+  function expireSession(message) {
+    drop(LOGIN_KEY);
+    drop(LAST_ACTIVE_KEY);
+    memoryActive = 0;
+    lastWrite = 0;
+
+    closeMenus();
 
     var loginView = document.getElementById('login-view');
     if (loginView) loginView.hidden = false;
@@ -329,24 +368,22 @@ document.addEventListener('DOMContentLoaded',function(){['calc-radial-menu','set
     if (passwordInput) passwordInput.value = '';
 
     var errorNode = document.getElementById('fintel-login-error');
-    if (errorNode) {
-      errorNode.textContent = 'نشست شما به دلیل ۱۵ دقیقه عدم فعالیت منقضی شد. لطفاً دوباره وارد شوید.';
-    }
+    if (errorNode) errorNode.textContent = message || '';
+
+    var usernameInput = document.getElementById('fintel-username');
+    if (usernameInput) { try { usernameInput.focus(); } catch (e) {} }
   }
 
   function checkIdleTimeout() {
-    try {
-      if (localStorage.getItem(LOGIN_KEY) !== 'true') return;
-      var lastActive = Number(localStorage.getItem(LAST_ACTIVE_KEY));
-      if (!Number.isFinite(lastActive) || lastActive <= 0) {
-        resetIdleTimer();
-        return;
-      }
-      if (Date.now() - lastActive > IDLE_TIMEOUT_LIMIT) logoutUser();
-    } catch (error) {}
+    if (!isLoggedIn()) return;
+    var lastActive = getLastActive();
+    if (!lastActive) { markActive(true); return; }
+    if (Date.now() - lastActive >= IDLE_TIMEOUT_LIMIT) expireSession(EXPIRED_MESSAGE);
   }
 
-  window.logoutUser = logoutUser;
+  window.logoutUser = function () { expireSession(''); };
+  window.checkIdleTimeout = checkIdleTimeout;
+
   window.handleLogin = function () {
     var usernameInput = document.getElementById('fintel-username');
     var passwordInput = document.getElementById('fintel-password');
@@ -357,18 +394,17 @@ document.addEventListener('DOMContentLoaded',function(){['calc-radial-menu','set
     var expectedUser;
     var expectedPassword;
     try {
-      expectedUser = localStorage.getItem(USERNAME_KEY) || 'admin';
-      expectedPassword = localStorage.getItem(PASSWORD_KEY) || '1234';
-    } catch (error) {
+      expectedUser = read(USERNAME_KEY) || 'admin';
+      expectedPassword = read(PASSWORD_KEY) || '1234';
+    } catch (e) {
       expectedUser = 'admin';
       expectedPassword = '1234';
     }
 
     if (usernameInput.value.trim() === expectedUser && passwordInput.value === expectedPassword) {
-      try {
-        localStorage.setItem(LOGIN_KEY, 'true');
-        localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
-      } catch (error) {}
+      write(LOGIN_KEY, 'true');
+      lastWrite = 0;
+      markActive(true);
       if (loginView) loginView.hidden = true;
       if (errorNode) errorNode.textContent = '';
       passwordInput.value = '';
@@ -401,36 +437,243 @@ document.addEventListener('DOMContentLoaded',function(){['calc-radial-menu','set
       return;
     }
 
-    try {
-      localStorage.setItem(USERNAME_KEY, newUsername);
-      localStorage.setItem(PASSWORD_KEY, newPassword);
-      messageNode.textContent = 'اطلاعات ورود با موفقیت ذخیره شد! از این پس با رمز جدید وارد خواهید شد.';
-      usernameNode.value = '';
-      passwordNode.value = '';
-      repeatNode.value = '';
-    } catch (error) {
+    if (!write(USERNAME_KEY, newUsername) || !write(PASSWORD_KEY, newPassword)) {
       messageNode.classList.add('error');
       messageNode.textContent = 'خطا در ذخیره اطلاعات در مرورگر.';
+      return;
     }
+
+    messageNode.textContent = 'اطلاعات ورود با موفقیت ذخیره شد! از این پس با نام کاربری و رمز جدید وارد می‌شوید.';
+    usernameNode.value = '';
+    passwordNode.value = '';
+    repeatNode.value = '';
+    markActive(true);
   };
 
-  ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'].forEach(function (eventName) {
-    window.addEventListener(eventName, resetIdleTimer, { passive: true });
+  ['mousemove', 'mousedown', 'pointerdown', 'keydown', 'touchstart', 'touchmove', 'wheel']
+    .forEach(function (name) { window.addEventListener(name, onActivity, { passive: true }); });
+
+  document.addEventListener('scroll', onActivity, { passive: true, capture: true });
+
+  window.addEventListener('focus', checkIdleTimeout);
+  window.addEventListener('pageshow', function (event) { if (event.persisted) checkIdleTimeout(); });
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) checkIdleTimeout();
   });
-  window.setInterval(checkIdleTimeout, 60 * 1000);
+
+  window.addEventListener('storage', function (event) {
+    if (event.key !== null && event.key !== LOGIN_KEY) return;
+    if (event.key === LOGIN_KEY && event.newValue === 'true') {
+      var loginView = document.getElementById('login-view');
+      if (loginView) loginView.hidden = true;
+      markActive(true);
+    } else {
+      expireSession('نشست شما در این مرورگر پایان یافت. لطفاً دوباره وارد شوید.');
+    }
+  });
+
+  window.setInterval(checkIdleTimeout, 10000);
 
   function restoreLoginState() {
-    try {
-      var loginView = document.getElementById('login-view');
-      if (localStorage.getItem(LOGIN_KEY) === 'true' && loginView) {
-        loginView.hidden = true;
-        resetIdleTimer();
-      }
-    } catch (error) {}
+    if (!isLoggedIn()) return;
+    var lastActive = getLastActive();
+    if (!lastActive || Date.now() - lastActive >= IDLE_TIMEOUT_LIMIT) {
+      expireSession(EXPIRED_MESSAGE);
+      return;
+    }
+    var loginView = document.getElementById('login-view');
+    if (loginView) loginView.hidden = true;
+    markActive(true);
   }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', restoreLoginState, { once: true });
   } else {
     restoreLoginState();
   }
 })();
+
+
+
+/* ============ ۲) آیکون «تغییر نام کاربری و رمز» در منوی تنظیمات ============ */
+(function () {
+  'use strict';
+
+  var OPTION_ID = 'settings-option-credentials';
+  var PANEL_ID = 'settings-password-section';
+  var ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8.5" cy="8.5" r="4.2"/><path d="M11.6 11.6 20 20M17 17l2-2M14.5 14.5l2-2"/></svg>';
+
+  function showSettingsView() {
+    ['calc-radial-menu', 'settings-radial-menu', 'fund-radial-menu'].forEach(function (id) {
+      var menu = document.getElementById(id);
+      if (!menu) return;
+      menu.classList.remove('is-open');
+      var center = menu.querySelector('.radial-center');
+      if (center) center.setAttribute('aria-expanded', 'false');
+    });
+    var views = { dashboard: 'dashboard-view', calc: 'calc-view', settings: 'settings-view', fund: 'fund-view' };
+    Object.keys(views).forEach(function (key) {
+      var el = document.getElementById(views[key]);
+      if (el) el.hidden = key !== 'settings';
+    });
+    document.querySelectorAll('#settings-view .settings-tab-content').forEach(function (p) { p.hidden = true; });
+    document.querySelectorAll('#settings-view .settings-tab').forEach(function (t) { t.classList.remove('is-active'); });
+  }
+
+  function activateAccountTab() {
+    var tab = document.getElementById('settings-tab-account');
+    if (tab) {
+      tab.classList.add('is-active');
+      tab.setAttribute('aria-selected', 'true');
+      tab.tabIndex = 0;
+    }
+    document.querySelectorAll('.settings-tab-content[role="tabpanel"]').forEach(function (panel) {
+      panel.hidden = panel.id !== 'settings-panel-account';
+    });
+  }
+
+  function buildPanelIfMissing(host) {
+    if (!host || document.getElementById(PANEL_ID)) return;
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.id = PANEL_ID;
+
+    var title = document.createElement('h3');
+    title.textContent = 'تغییر نام کاربری و رمز عبور';
+    card.appendChild(title);
+
+    var note = document.createElement('p');
+    note.className = 'settings-note';
+    note.textContent = 'اطلاعات ورود در همین مرورگر ذخیره می‌شود.';
+    card.appendChild(note);
+
+    [['new-username', 'نام کاربری جدید', 'text'],
+     ['new-password', 'رمز عبور جدید', 'password'],
+     ['repeat-password', 'تکرار رمز عبور جدید', 'password']].forEach(function (def) {
+      var label = document.createElement('label');
+      label.setAttribute('for', def[0]);
+      label.textContent = def[1];
+      var input = document.createElement('input');
+      input.id = def[0];
+      input.type = def[2];
+      input.className = 'settings-input';
+      input.autocomplete = 'new-password';
+      card.appendChild(label);
+      card.appendChild(input);
+    });
+
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'settings-button';
+    button.textContent = 'ذخیره اطلاعات ورود';
+    button.addEventListener('click', function () { window.saveLoginInfo(); });
+    card.appendChild(button);
+
+    var message = document.createElement('p');
+    message.id = 'login-message';
+    message.className = 'settings-note';
+    message.setAttribute('role', 'status');
+    card.appendChild(message);
+
+    host.appendChild(card);
+  }
+
+  function openCredentials() {
+    showSettingsView();
+    activateAccountTab();
+
+    var host = document.getElementById('settings-panel-account');
+    buildPanelIfMissing(host);
+
+    ['settings-level-section', 'user-account-manager', 'access-manager'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.add('settings-subsection-hidden');
+    });
+
+    var panel = document.getElementById(PANEL_ID);
+    if (panel) {
+      panel.classList.remove('settings-subsection-hidden');
+      panel.hidden = false;
+      var first = panel.querySelector('input');
+      if (first) { try { first.focus(); } catch (e) {} }
+    }
+
+    var menu = document.getElementById('settings-radial-menu');
+    if (menu) {
+      menu.querySelectorAll('.radial-option').forEach(function (item) {
+        item.classList.toggle('is-active', item.id === OPTION_ID);
+      });
+      menu.classList.remove('is-open');
+      var center = menu.querySelector('.radial-center');
+      if (center) center.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function layoutMenu(menu) {
+    var items = Array.from(menu.querySelectorAll('.radial-option'));
+    if (!items.length) return;
+    var small = window.matchMedia('(max-width:560px)').matches;
+    var size = small ? 56 : 64;
+    var radius = Math.min(small ? 142 : 170, Math.max(96, (window.innerHeight - size - 36) / 2));
+    items.forEach(function (item, index) {
+      var angle = (-90 + 180 * index / Math.max(1, items.length - 1)) * Math.PI / 180;
+      item.style.setProperty('--dx', (-Math.cos(angle) * radius) + 'px');
+      item.style.setProperty('--dy', (Math.sin(angle) * radius) + 'px');
+    });
+  }
+
+  function inject() {
+    var menu = document.getElementById('settings-radial-menu');
+    if (!menu) return false;
+    if (document.getElementById(OPTION_ID)) { layoutMenu(menu); return true; }
+
+    var template = menu.querySelector('.radial-option[data-setting-section="password"]') ||
+                   menu.querySelector('.radial-option');
+    if (!template) return false;
+
+    var option = template.cloneNode(true);
+    option.id = OPTION_ID;
+    option.dataset.settingSection = 'credentials';
+    option.classList.remove('is-active');
+    option.setAttribute('aria-label', 'تغییر نام کاربری و رمز عبور');
+    option.setAttribute('title', 'تغییر نام کاربری و رمز عبور');
+
+    var svg = option.querySelector('svg');
+    if (svg) svg.outerHTML = ICON;
+
+    var label = option.querySelector('.radial-label, span');
+    if (label) label.textContent = 'تغییر رمز';
+
+    var fresh = option.cloneNode(true);
+    option.parentNode.replaceChild(fresh, option);
+    fresh.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      openCredentials();
+    });
+
+    layoutMenu(menu);
+    return true;
+  }
+
+  function boot() {
+    if (inject()) return;
+    var tries = 0;
+    var timer = window.setInterval(function () {
+      tries += 1;
+      if (inject() || tries > 40) window.clearInterval(timer);
+    }, 250);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
+  }
+  window.addEventListener('resize', function () {
+    var menu = document.getElementById('settings-radial-menu');
+    if (menu && menu.classList.contains('is-open')) layoutMenu(menu);
+  });
+})();
+
+
